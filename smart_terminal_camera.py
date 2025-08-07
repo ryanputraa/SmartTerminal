@@ -73,16 +73,25 @@ class SmartTerminalApp(QWidget):
         self.camera_selector.clear()
         index = 0
         try:
-            output = subprocess.check_output(
-                "ffmpeg -list_devices true -f dshow -i dummy",
-                stderr=subprocess.STDOUT, shell=True).decode()
+            result = subprocess.run(
+                "ffmpeg -hide_banner -list_devices true -f dshow -i dummy",
+                stderr=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                shell=True,
+                text=True,      # so result.stderr is a string
+                check=False     # don't throw exception on non-zero exit
+            )
+            output = result.stderr  # FFmpeg lists devices in stderr
+
             for line in output.splitlines():
                 if "dshow" in line and "video" in line:
                     name = line.split('"')[1]
                     self.camera_selector.addItem(name, index)
                     index += 1
+
         except Exception as e:
             print("Error detecting cameras:", e)
+
 
     def update_resolution_list(self):
         current = self.resolution_selector.currentText()
