@@ -25,6 +25,7 @@ class SmartTerminalApp(QWidget):
         self.init_ui()
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_frame)
+        self.populate_resolutions()  # <-- FIX: Populate resolution options at launch
         self.start_camera()
 
     def init_ui(self):
@@ -50,11 +51,11 @@ class SmartTerminalApp(QWidget):
         control_layout.addWidget(self.camera_selector)
 
         self.resolution_selector = QComboBox()
-        self.resolution_selector.currentIndexChanged.connect(self.apply_resolution_change)
+        self.resolution_selector.currentIndexChanged.connect(self.restart_camera)
         control_layout.addWidget(self.resolution_selector)
 
         self.enable_4k_checkbox = QCheckBox("Enable 4K")
-        self.enable_4k_checkbox.stateChanged.connect(self.populate_resolutions)
+        self.enable_4k_checkbox.stateChanged.connect(lambda: self.update_resolution_list())
         control_layout.addWidget(self.enable_4k_checkbox)
 
         self.record_btn = QPushButton("Start Recording")
@@ -83,8 +84,15 @@ class SmartTerminalApp(QWidget):
         except Exception as e:
             print("Error detecting cameras:", e)
 
-    def populate_resolutions(self):
+    def update_resolution_list(self):
         current = self.resolution_selector.currentText()
+        self.populate_resolutions()
+        for i in range(self.resolution_selector.count()):
+            if self.resolution_selector.itemText(i) == current:
+                self.resolution_selector.setCurrentIndex(i)
+                break
+
+    def populate_resolutions(self):
         self.resolution_selector.clear()
         resolutions = [
             (1920, 1080), (1280, 720), (800, 600), (640, 480), (320, 240)
@@ -97,32 +105,11 @@ class SmartTerminalApp(QWidget):
         for w, h in resolutions:
             self.resolution_selector.addItem(f"{w}x{h}", (w, h))
 
-        for i in range(self.resolution_selector.count()):
-            if self.resolution_selector.itemText(i) == current:
-                self.resolution_selector.setCurrentIndex(i)
-                return
-        for i in range(self.resolution_selector.count()):
-            if self.resolution_selector.itemText(i) == "1920x1080":
-                self.resolution_selector.setCurrentIndex(i)
-                return
-
-    def apply_resolution_change(self):
-        if self.cap:
-            current_data = self.resolution_selector.currentData()
-            if current_data:
-                w, h = current_data
-                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
-                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
-
     def start_camera(self):
-        if self.cap:
-            self.cap.release()
-
         self.camera_index = self.camera_selector.currentData()
         if self.camera_index is None:
             self.camera_index = 0
 
-        self.populate_resolutions()
         resolution_data = self.resolution_selector.currentData()
         if resolution_data:
             w, h = resolution_data
@@ -174,6 +161,7 @@ class SmartTerminalApp(QWidget):
                     Qt.SmoothTransformation
                 )
                 self.video_label.setPixmap(scaled_pixmap)
+
                 if self.recording and self.video_writer is not None:
                     self.video_writer.write(frame)
 
